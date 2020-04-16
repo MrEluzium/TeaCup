@@ -4,6 +4,13 @@ from discord import Embed
 from discord.ext import commands
 from youtube import get_music_url
 from settings import TOKEN
+from os import name as os_name
+
+if os_name == 'nt':
+    print('Boot on Windows. opus loaded automatically.')
+else:
+    discord.opus.load_opus('libopus.so')
+    print('Boot on Linux. libopus.so loaded')
 
 ffmpeg_options = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
@@ -50,6 +57,8 @@ async def play(ctx, *text):
                                   url=video_url,
                                   description=f"{title} [{ctx.author.mention}]")
             await ctx.send(embed=emb)
+            if not discord.opus.is_loaded():
+                print('No opus loaded!')
     except IndexError:
         emb = cup_embed(title="There is a problem :(",
                         description=f"Sorry, I can't find {text}.")
