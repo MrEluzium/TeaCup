@@ -53,12 +53,11 @@ async def play(ctx, *text):
         url, video_url, title = data['url'], data['video_url'], data['title']
         if ctx.guild.voice_client:
             ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
+            await ctx.message.delete(2)
             emb = cup_embed(title="Now playng",
                                   url=video_url,
                                   description=f"{title} [{ctx.author.mention}]")
             await ctx.send(embed=emb)
-            if not discord.opus.is_loaded():
-                print('No opus loaded!')
     except IndexError:
         emb = cup_embed(title="There is a problem :(",
                         description=f"Sorry, I can't find {text}.")
