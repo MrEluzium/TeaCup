@@ -1,11 +1,11 @@
 import discord
 import asyncio
-from cup_embed import cup_embed
+from cup_embed import cup_embed, queue_cup_embed
 from discord.ext import commands
 from youtube import get_music_url
 from settings import TOKEN
 from os import name as os_name
-guild_data = {'pattern': {'queue': []}}
+guild_data = {'pattern': {'queue': [], 'msg': {'now': None, 'queue:': None}}}
 
 if os_name == 'nt':
     print('Boot on Windows. opus loaded automatically.')
@@ -68,24 +68,12 @@ async def connect(ctx):
     else:
         emb = cup_embed(title="There is a problem :(",
                         description="You must join the voice channel first.")
-        await ctx.send(embed=emb)
+        await ctx.send(embed=emb, delete_after=5)
+        if ctx.message:
+            await asyncio.sleep(5)
+            await ctx.message.delete()
         return False
     return True
-
-
-@bot.command(name='loop')
-async def loop(ctx):
-    voice = ctx.guild.voice_client
-    if voice:
-        await ctx.send(type(voice.latency()))
-
-
-@bot.command(name='stop', aliases=['s'])
-async def stop(ctx):
-    if ctx.message:
-        await ctx.message.delete()
-    if ctx.guild.voice_client.is_playing():
-        ctx.guild.voice_client.stop()
 
 
 @bot.command(name='disconnect', aliases=['leave'])
@@ -97,6 +85,29 @@ async def disconnect(ctx):
         await voice.disconnect()
 
 
+# @bot.command(name='queue', aliases=['q'])
+async def queue(ctx):
+    try:
+        if guild_data[ctx.guild.id]['msg']['queue']:
+            await guild_data[ctx.guild.id]['msg']['queue'].delete()
+            guild_data[ctx.guild.id]['msg']['queue'] = None
+        emb = queue_cup_embed(guild_data[ctx.guild.id]['queue'])
+    except KeyError:
+        await guild_data_setup(ctx)
+        emb = queue_cup_embed(guild_data[ctx.guild.id]['queue'])
+
+    msg_queue = await ctx_message_send(ctx, embed=emb)
+    guild_data[ctx.guild.id]['msg']['queue'] = msg_queue
+
+
+@bot.command(name='stop', aliases=['s'])
+async def stop(ctx):
+    if ctx.message:
+        await ctx.message.delete()
+    if ctx.guild.voice_client.is_playing():
+        ctx.guild.voice_client.stop()
+
+
 async def add_queue(ctx, text):
     global guild_data
 
@@ -106,16 +117,18 @@ async def add_queue(ctx, text):
         try:
             guild_data[ctx.guild.id]['queue'].append(data)
         except KeyError:
-            guild_data = {ctx.guild.id: {'queue': []}}
+            await guild_data_setup(ctx)
             guild_data[ctx.guild.id]['queue'].append(data)
         if ctx.message:
             await ctx.message.delete()
-        emb = cup_embed(title="Queued",
-                        url=video_url,
-                        description=f"{title} [{author}]")
-        await ctx.send(embed=emb)
         if len(guild_data[ctx.guild.id]['queue']) == 1:
             await play_next(ctx)
+        else:
+            emb = cup_embed(title="Queued",
+                            url=video_url,
+                            description=f"{title} [{author}]")
+            await ctx.send(embed=emb, delete_after=4)
+            await queue(ctx)
 
 
 async def play_next(ctx):
@@ -123,12 +136,18 @@ async def play_next(ctx):
     url, video_url, title, duration, author = data['url'], data['video_url'], data['title'], data['duration'], data['author']
     if ctx.guild.voice_client:
         ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
-        emb = cup_embed(title="Now playng",
+        emb = cup_embed(title="Now playing",
                         url=video_url,
                         description=f"{title} [{author}]")
         msg_now = await ctx_message_send(ctx, embed=emb)
+        guild_data[ctx.guild.id]['msg']['now'] = msg_now
+        await queue(ctx)
     await asyncio.sleep(duration)
     guild_data[ctx.guild.id]['queue'].pop(0)
+    await guild_data[ctx.guild.id]['msg']['now'].delete()
+    if guild_data[ctx.guild.id]['msg']['queue']:
+        await guild_data[ctx.guild.id]['msg']['queue'].delete()
+        guild_data[ctx.guild.id]['msg']['queue'] = None
     if len(guild_data[ctx.guild.id]['queue']):
         msg_next = await ctx_message_send(ctx, 'playing next...', delete_after=0)
         await msg_next.add_reaction("\u23E9")
@@ -140,6 +159,11 @@ async def ctx_message_send(ctx, content=None, embed=None, delete_after=None):
     else:
         msg = await ctx.send(content=content, embed=embed, delete_after=delete_after)
     return msg
+
+
+async def guild_data_setup(ctx):
+    global guild_data
+    guild_data = {ctx.guild.id: {'queue': [], 'msg': {'now': None, 'queue': None}}}
 
 
 async def voice_check(voice_client):

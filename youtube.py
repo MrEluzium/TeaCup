@@ -36,7 +36,10 @@ async def get_music_url(url, ctx):
     except IndexError:
         emb = cup_embed(title="There is a problem :(",
                         description=f"Sorry, I can't find {url}.")
-        await ctx.send(embed=emb)
+        await ctx.send(embed=emb, delete_after=5)
+        if ctx.message:
+            await asyncio.sleep(5)
+            await ctx.message.delete()
 
 
 
