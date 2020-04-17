@@ -112,7 +112,6 @@ async def add_queue(ctx, text):
                         url=video_url,
                         description=f"{title} [{author}]")
         await ctx.send(embed=emb)
-        print('Queue: ', len(guild_data[ctx.guild.id]['queue']))
         if len(guild_data[ctx.guild.id]['queue']) == 1:
             await play_next(ctx)
 

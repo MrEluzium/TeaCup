@@ -33,8 +33,7 @@ async def get_music_url(url, ctx):
                 'title': data['title'],
                 'duration': data['duration'],
                 'author': ctx.author.mention}
-    except IndexError as e:
-        print('YT error: ', e)
+    except IndexError:
         emb = cup_embed(title="There is a problem :(",
                         description=f"Sorry, I can't find {url}.")
         await ctx.send(embed=emb)
