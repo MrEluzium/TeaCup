@@ -47,8 +47,6 @@ async def on_ready():
 @bot.command(name='play', aliases=['p'])
 async def play(ctx, *text):
     text = ' '.join(text)
-    if ctx.message:
-        await ctx.message.delete()
     await connect(ctx)
     try:
         data = await get_music_url(text)
