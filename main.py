@@ -47,13 +47,14 @@ async def on_ready():
 @bot.command(name='play', aliases=['p'])
 async def play(ctx, *text):
     text = ' '.join(text)
+    if ctx.message:
+        await ctx.message.delete()
     await connect(ctx)
     try:
         data = await get_music_url(text)
         url, video_url, title = data['url'], data['video_url'], data['title']
         if ctx.guild.voice_client:
             ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
-            await ctx.message.delete(delay=2)
             emb = cup_embed(title="Now playng",
                                   url=video_url,
                                   description=f"{title} [{ctx.author.mention}]")
@@ -66,6 +67,8 @@ async def play(ctx, *text):
 
 @bot.command(name='connect', aliases=['join'])
 async def connect(ctx):
+    if ctx.message:
+        await ctx.message.delete()
     voice = ctx.guild.voice_client
     if voice:
         await voice.move_to(ctx.author.voice.channel)
@@ -86,24 +89,32 @@ async def loop(ctx):
 
 @bot.command(name='stop', aliases=['s'])
 async def stop(ctx):
+    if ctx.message:
+        await ctx.message.delete()
     if ctx.guild.voice_client.is_playing():
         ctx.guild.voice_client.stop()
 
 
 @bot.command(name='pause')
 async def pause(ctx):
+    if ctx.message:
+        await ctx.message.delete()
     if ctx.guild.voice_client.is_playing():
         ctx.guild.voice_client.pause()
 
 
 @bot.command(name='resume')
 async def resume(ctx):
+    if ctx.message:
+        await ctx.message.delete()
     if ctx.guild.voice_client.is_paused():
         ctx.guild.voice_client.resume()
 
 
 @bot.command(name='disconnect', aliases=['leave'])
 async def disconnect(ctx):
+    if ctx.message:
+        await ctx.message.delete()
     voice = ctx.guild.voice_client
     if voice:
         await voice.disconnect()
