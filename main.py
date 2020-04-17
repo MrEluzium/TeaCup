@@ -54,14 +54,14 @@ async def on_reaction_add(reaction, user):
 @bot.command(name='play', aliases=['p'])
 async def play(ctx, *text):
     text = ' '.join(text)
-    await connect(ctx)
-    await add_queue(ctx, text)
+    if await connect(ctx):
+        await add_queue(ctx, text)
 
 
 @bot.command(name='connect', aliases=['join'])
 async def connect(ctx):
     voice = ctx.guild.voice_client
-    if voice:
+    if voice and ctx.author.voice:
         await voice.move_to(ctx.author.voice.channel)
     elif ctx.author.voice:
         await ctx.author.voice.channel.connect()
@@ -69,6 +69,8 @@ async def connect(ctx):
         emb = cup_embed(title="There is a problem :(",
                         description="You must join the voice channel first.")
         await ctx.send(embed=emb)
+        return False
+    return True
 
 
 @bot.command(name='loop')
@@ -124,7 +126,7 @@ async def play_next(ctx):
         emb = cup_embed(title="Now playng",
                         url=video_url,
                         description=f"{title} [{author}]")
-        await ctx_message_send(ctx, embed=emb)
+        msg_now = await ctx_message_send(ctx, embed=emb)
     await asyncio.sleep(duration)
     guild_data[ctx.guild.id]['queue'].pop(0)
     if len(guild_data[ctx.guild.id]['queue']):
