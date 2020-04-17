@@ -1,10 +1,11 @@
 import discord
 import asyncio
-from discord import Embed
+from cup_embed import cup_embed
 from discord.ext import commands
 from youtube import get_music_url
 from settings import TOKEN
 from os import name as os_name
+guild_data = {'pattern': {'queue': []}}
 
 if os_name == 'nt':
     print('Boot on Windows. opus loaded automatically.')
@@ -44,29 +45,21 @@ async def on_ready():
         await on_guild_join(guild)
 
 
+@bot.event
+async def on_reaction_add(reaction, user):
+    if user and reaction.me:
+        await play_next(reaction.message)
+
+
 @bot.command(name='play', aliases=['p'])
 async def play(ctx, *text):
     text = ' '.join(text)
     await connect(ctx)
-    try:
-        data = await get_music_url(text)
-        url, video_url, title = data['url'], data['video_url'], data['title']
-        if ctx.guild.voice_client:
-            ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
-            emb = cup_embed(title="Now playng",
-                                  url=video_url,
-                                  description=f"{title} [{ctx.author.mention}]")
-            await ctx.send(embed=emb)
-    except IndexError:
-        emb = cup_embed(title="There is a problem :(",
-                        description=f"Sorry, I can't find {text}.")
-        await ctx.send(embed=emb)
+    await add_queue(ctx, text)
 
 
 @bot.command(name='connect', aliases=['join'])
 async def connect(ctx):
-    if ctx.message:
-        await ctx.message.delete()
     voice = ctx.guild.voice_client
     if voice:
         await voice.move_to(ctx.author.voice.channel)
@@ -93,22 +86,6 @@ async def stop(ctx):
         ctx.guild.voice_client.stop()
 
 
-@bot.command(name='pause')
-async def pause(ctx):
-    if ctx.message:
-        await ctx.message.delete()
-    if ctx.guild.voice_client.is_playing():
-        ctx.guild.voice_client.pause()
-
-
-@bot.command(name='resume')
-async def resume(ctx):
-    if ctx.message:
-        await ctx.message.delete()
-    if ctx.guild.voice_client.is_paused():
-        ctx.guild.voice_client.resume()
-
-
 @bot.command(name='disconnect', aliases=['leave'])
 async def disconnect(ctx):
     if ctx.message:
@@ -118,17 +95,57 @@ async def disconnect(ctx):
         await voice.disconnect()
 
 
+async def add_queue(ctx, text):
+    global guild_data
+
+    data = await get_music_url(text, ctx)
+    if data:
+        video_url, title, duration, author = data['video_url'], data['title'], data['duration'], data['author']
+        try:
+            guild_data[ctx.guild.id]['queue'].append(data)
+        except KeyError:
+            guild_data = {ctx.guild.id: {'queue': []}}
+            guild_data[ctx.guild.id]['queue'].append(data)
+        if ctx.message:
+            await ctx.message.delete()
+        emb = cup_embed(title="Queued",
+                        url=video_url,
+                        description=f"{title} [{author}]")
+        await ctx.send(embed=emb)
+        print('Queue: ', len(guild_data[ctx.guild.id]['queue']))
+        if len(guild_data[ctx.guild.id]['queue']) == 1:
+            await play_next(ctx)
+
+
+async def play_next(ctx):
+    data = guild_data[ctx.guild.id]['queue'][0]
+    url, video_url, title, duration, author = data['url'], data['video_url'], data['title'], data['duration'], data['author']
+    if ctx.guild.voice_client:
+        ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
+        emb = cup_embed(title="Now playng",
+                        url=video_url,
+                        description=f"{title} [{author}]")
+        await ctx_message_send(ctx, embed=emb)
+    await asyncio.sleep(duration)
+    guild_data[ctx.guild.id]['queue'].pop(0)
+    if len(guild_data[ctx.guild.id]['queue']):
+        msg_next = await ctx_message_send(ctx, 'playing next...', delete_after=0)
+        await msg_next.add_reaction("\u23E9")
+
+
+async def ctx_message_send(ctx, content=None, embed=None, delete_after=None):
+    if type(ctx) is discord.message.Message:
+        msg = await ctx.channel.send(content=content, embed=embed, delete_after=delete_after)
+    else:
+        msg = await ctx.send(content=content, embed=embed, delete_after=delete_after)
+    return msg
+
+
 async def voice_check(voice_client):
     if voice_client is None:
         await asyncio.sleep(90)
         if voice_client is None and voice_client.is_playing() is False and voice_client.is_paused() is False:
             await voice_client.disconnect()
-
-
-def cup_embed(title, description, url=None):
-    emb = Embed(title=title, url=url,
-                description=description, color=0x0df7e6).set_footer(text="teacup")
-    return emb
 
 
 async def get_channel(guild):
