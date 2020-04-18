@@ -143,13 +143,14 @@ async def play_next(ctx):
         guild_data[ctx.guild.id]['msg']['now'] = msg_now
         await queue(ctx)
     await asyncio.sleep(duration)
+
     guild_data[ctx.guild.id]['queue'].pop(0)
     await guild_data[ctx.guild.id]['msg']['now'].delete()
     if guild_data[ctx.guild.id]['msg']['queue']:
         await guild_data[ctx.guild.id]['msg']['queue'].delete()
         guild_data[ctx.guild.id]['msg']['queue'] = None
     if len(guild_data[ctx.guild.id]['queue']):
-        msg_next = await ctx_message_send(ctx, 'playing next...', delete_after=0)
+        msg_next = await ctx_message_send(ctx, 'playing next...', delete_after=1)
         await msg_next.add_reaction("\u23E9")
 
 
@@ -172,10 +173,5 @@ async def voice_check(voice_client):
         if voice_client is None and voice_client.is_playing() is False and voice_client.is_paused() is False:
             await voice_client.disconnect()
 
-
-async def get_channel(guild):
-    print(guild.voice_client)
-    # guild.me.voice.disconnect()
-    # return guild.me.voice.channel
 
 bot.run(TOKEN)
