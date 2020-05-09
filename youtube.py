@@ -22,14 +22,21 @@ ytdl = youtube_dl.YoutubeDL(params=ytdl_format_options)
 
 
 async def get_music_url(url, ctx):
+    searched_url = None
     try:
-        if not is_url(url):
-            result = YoutubeSearch(url, max_results=1).to_dict()[0]['link']
-            url = f"https://www.youtube.com{result}"
-        loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url=url, download=False))
+        for i in range(3):
+            if not is_url(url):
+                result = YoutubeSearch(url, max_results=3).to_dict()[i]['link']
+                searched_url = f"https://www.youtube.com{result}"
+            final_url = searched_url if searched_url else url
+            loop = asyncio.get_event_loop()
+            try:
+                data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url=final_url, download=False))
+                break
+            except youtube_dl.utils.DownloadError:
+                i += 1
         return {'url': data['url'],
-                'video_url': url,
+                'video_url': final_url,
                 'title': data['title'],
                 'duration': data['duration'],
                 'author': ctx.author.mention}

@@ -5,7 +5,7 @@ from discord.ext import tasks, commands
 from youtube import get_music_url
 from settings import TOKEN
 from os import name as os_name
-guild_data = {'pattern': {'queue': [], 'msg': {'now': None, 'queue:': None}}}
+guild_data = {'pattern': {'queue': [], 'msg': {'now': None, 'queue:': None}, 'bulker': None}}
 
 if os_name == 'nt':
     print('Boot on Windows. opus loaded automatically.')
@@ -15,7 +15,7 @@ else:
 
 ffmpeg_options = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn -nostats -loglevel 0'
+    'options': '-vn -nostats -loglevel 24'
 }
 
 bot = commands.Bot(command_prefix='--')
@@ -115,6 +115,15 @@ async def stop(ctx):
         ctx.guild.voice_client.stop()
 
 
+@bot.command(name='next', aliases=['n'])
+async def next(ctx):
+    if ctx.message:
+        await ctx.message.delete()
+    ctx.guild.voice_client.stop()
+    guild_data[ctx.guild.id]['bulker'].stop()
+    await after_bulker(ctx)
+
+
 async def add_queue(ctx, text):
     global guild_data
 
@@ -142,15 +151,30 @@ async def play_next(ctx):
     data = guild_data[ctx.guild.id]['queue'][0]
     url, video_url, title, duration, author = data['url'], data['video_url'], data['title'], data['duration'], data['author']
     if ctx.guild.voice_client:
-        ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
-        emb = cup_embed(title="Now playing",
-                        url=video_url,
-                        description=f"{title} [{author}]")
-        msg_now = await ctx_message_send(ctx, embed=emb)
-        guild_data[ctx.guild.id]['msg']['now'] = msg_now
-        await queue(ctx)
-    await asyncio.sleep(duration)
+        guild_data[ctx.guild.id]['bulker'] = create_bulker(ctx, data)
+        guild_data[ctx.guild.id]['bulker'].change_interval(seconds=duration)
+        guild_data[ctx.guild.id]['bulker'].start(ctx, data)
 
+
+def create_bulker(ctx_start, data_start):
+    @tasks.loop(count=2)
+    async def bulker(ctx, data):
+        if guild_data[ctx.guild.id]['bulker'].current_loop == 0:
+            url, video_url, title, duration, author = data['url'], data['video_url'], data['title'], data['duration'], data[
+                'author']
+            ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
+            emb = cup_embed(title="Now playing",
+                            url=video_url,
+                            description=f"{title} [{author}]")
+            msg_now = await ctx_message_send(ctx, embed=emb)
+            guild_data[ctx.guild.id]['msg']['now'] = msg_now
+            await queue(ctx)
+        else:
+            await after_bulker(ctx)
+    return bulker
+
+
+async def after_bulker(ctx):
     guild_data[ctx.guild.id]['queue'].pop(0)
     await guild_data[ctx.guild.id]['msg']['now'].delete()
     if guild_data[ctx.guild.id]['msg']['queue']:
@@ -171,7 +195,7 @@ async def ctx_message_send(ctx, content=None, embed=None, delete_after=None):
 
 async def guild_data_setup(ctx):
     global guild_data
-    guild_data = {ctx.guild.id: {'queue': [], 'msg': {'now': None, 'queue': None}}}
+    guild_data = {ctx.guild.id: {'queue': [], 'msg': {'now': None, 'queue': None}, 'bulker': None}}
 
 
 async def voice_check(voice_client):
