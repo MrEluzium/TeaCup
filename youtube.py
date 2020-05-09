@@ -25,12 +25,15 @@ async def get_music_url(url, ctx):
     try:
         i = 0
         while True:
+            print(url)
             if not is_url(url):
                 result = YoutubeSearch(url, max_results=10).to_dict()[i]['link']
+                print(result)
                 searched_url = f"https://www.youtube.com{result}"
             loop = asyncio.get_event_loop()
             try:
                 data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url=url if is_url(url) else searched_url, download=False))
+                print(data)
                 url = url if is_url(url) else searched_url
                 break
             except youtube_dl.utils.DownloadError:
