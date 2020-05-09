@@ -142,15 +142,25 @@ async def play_next(ctx):
     data = guild_data[ctx.guild.id]['queue'][0]
     url, video_url, title, duration, author = data['url'], data['video_url'], data['title'], data['duration'], data['author']
     if ctx.guild.voice_client:
-        ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
-        emb = cup_embed(title="Now playing",
-                        url=video_url,
-                        description=f"{title} [{author}]")
-        msg_now = await ctx_message_send(ctx, embed=emb)
-        guild_data[ctx.guild.id]['msg']['now'] = msg_now
-        await queue(ctx)
-    await asyncio.sleep(duration)
+        bulker.change_interval(duration)
+        bulker.start(ctx, data)
 
+
+@tasks.loop(count=1)
+async def bulker(ctx, data):
+    url, video_url, title, duration, author = data['url'], data['video_url'], data['title'], data['duration'], data[
+        'author']
+    ctx.guild.voice_client.play(discord.FFmpegPCMAudio(url, **ffmpeg_options))
+    emb = cup_embed(title="Now playing",
+                    url=video_url,
+                    description=f"{title} [{author}]")
+    msg_now = await ctx_message_send(ctx, embed=emb)
+    guild_data[ctx.guild.id]['msg']['now'] = msg_now
+    await queue(ctx)
+
+
+@bulker.after_loop
+async def on_bulker_cancel(ctx):
     guild_data[ctx.guild.id]['queue'].pop(0)
     await guild_data[ctx.guild.id]['msg']['now'].delete()
     if guild_data[ctx.guild.id]['msg']['queue']:
