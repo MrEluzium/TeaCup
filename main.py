@@ -142,7 +142,7 @@ async def play_next(ctx):
     data = guild_data[ctx.guild.id]['queue'][0]
     url, video_url, title, duration, author = data['url'], data['video_url'], data['title'], data['duration'], data['author']
     if ctx.guild.voice_client:
-        bulker.change_interval(duration)
+        bulker.change_interval(seconds=duration)
         bulker.start(ctx, data)
 
 
@@ -157,10 +157,12 @@ async def bulker(ctx, data):
     msg_now = await ctx_message_send(ctx, embed=emb)
     guild_data[ctx.guild.id]['msg']['now'] = msg_now
     await queue(ctx)
+    await asyncio.sleep(duration)
+    await after_bulker(ctx)
 
 
-@bulker.after_loop
-async def on_bulker_cancel(ctx):
+# @bulker.after_loop
+async def after_bulker(ctx):
     guild_data[ctx.guild.id]['queue'].pop(0)
     await guild_data[ctx.guild.id]['msg']['now'].delete()
     if guild_data[ctx.guild.id]['msg']['queue']:
