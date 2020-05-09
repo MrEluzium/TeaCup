@@ -1,7 +1,7 @@
 import discord
 import asyncio
 from cup_embed import cup_embed, queue_cup_embed
-from discord.ext import commands
+from discord.ext import tasks, commands
 from youtube import get_music_url
 from settings import TOKEN
 from os import name as os_name
@@ -19,6 +19,12 @@ ffmpeg_options = {
 }
 
 bot = commands.Bot(command_prefix='--')
+
+
+async def set_activity():
+    activities = ['#StayHome', f'on {len(bot.guilds)} servers!', 'Cake is a lie!']
+    cur_activity = discord.Game(activities[0])
+    await bot.change_presence(status=discord.Status.online, activity=cur_activity)
 
 
 @bot.event
@@ -40,6 +46,7 @@ async def on_guild_remove(guild):
 
 @bot.event
 async def on_ready():
+    await set_activity()
     print(f'{bot.user} has connected to Discord!')
     for guild in bot.guilds:
         await on_guild_join(guild)
