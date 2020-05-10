@@ -2,13 +2,14 @@ import discord
 import asyncio
 from cup_embed import cup_embed, queue_cup_embed
 from discord.ext import tasks, commands
+from discord.ext.commands import Context
 from youtube import get_music_url
 from settings import TOKEN
 from os import name as os_name
 guild_data = {'pattern': {'queue': [], 'msg': {'now': None, 'queue:': None}, 'bulker': None}}
 
 if os_name == 'nt':
-    print('Boot on Windows. opus loaded automatically.')
+    print('Boot on Windows. Opus loaded automatically.')
 else:
     discord.opus.load_opus('libopus.so')
     print('Boot on Linux. libopus.so loaded')
@@ -59,19 +60,20 @@ async def on_reaction_add(reaction, user):
 
 
 @bot.command(name='play', aliases=['p'])
-async def play(ctx, *text):
+async def play(ctx, *text, channel=None):
     text = ' '.join(text)
-    if await connect(ctx):
+    if await connect(ctx, channel=channel):
         await add_queue(ctx, text)
 
 
-@bot.command(name='connect', aliases=['join'])
-async def connect(ctx):
+# @bot.command(name='connect', aliases=['join'])
+async def connect(ctx, channel=None):
     voice = ctx.guild.voice_client
+    channel = channel if channel else ctx.author.voice.channel
     if voice and ctx.author.voice:
-        await voice.move_to(ctx.author.voice.channel)
+        await voice.move_to(channel)
     elif ctx.author.voice:
-        await ctx.author.voice.channel.connect()
+        await channel.connect()
     else:
         emb = cup_embed(title="There is a problem :(",
                         description="You must join the voice channel first.")
@@ -98,30 +100,38 @@ async def queue(ctx):
         if guild_data[ctx.guild.id]['msg']['queue']:
             await guild_data[ctx.guild.id]['msg']['queue'].delete()
             guild_data[ctx.guild.id]['msg']['queue'] = None
-        emb = queue_cup_embed(guild_data[ctx.guild.id]['queue'])
     except KeyError:
         await guild_data_setup(ctx)
-        emb = queue_cup_embed(guild_data[ctx.guild.id]['queue'])
+    except discord.errors.NotFound:
+        print(ctx.guild.name, ": no queue msg found")
 
+    emb = queue_cup_embed(guild_data[ctx.guild.id]['queue'])
     msg_queue = await ctx_message_send(ctx, embed=emb)
     guild_data[ctx.guild.id]['msg']['queue'] = msg_queue
 
 
+# TODO stop command
 @bot.command(name='stop', aliases=['s'])
 async def stop(ctx):
-    if ctx.message:
-        await ctx.message.delete()
-    if ctx.guild.voice_client.is_playing():
-        ctx.guild.voice_client.stop()
+    ctx.send("No stop future, sry", delete_after=3)
+
+
+@bot.command(name='storm')
+async def storm(ctx):
+    msg = await ctx.send('playing...', delete_after=3)
+    await play(Context(message=msg, prefix='--'), "Леван Горозия Шторм", channel=bot.get_channel(699697856851738688))
 
 
 @bot.command(name='next', aliases=['n'])
 async def next(ctx):
     if ctx.message:
         await ctx.message.delete()
-    ctx.guild.voice_client.stop()
-    guild_data[ctx.guild.id]['bulker'].stop()
-    await after_bulker(ctx)
+    try:
+        ctx.guild.voice_client.stop()
+        guild_data[ctx.guild.id]['bulker'].cancel()
+        await after_bulker(ctx)
+    except (AttributeError, IndexError):
+        pass
 
 
 async def add_queue(ctx, text):
@@ -176,13 +186,17 @@ def create_bulker(ctx_start, data_start):
 
 async def after_bulker(ctx):
     guild_data[ctx.guild.id]['queue'].pop(0)
-    await guild_data[ctx.guild.id]['msg']['now'].delete()
-    if guild_data[ctx.guild.id]['msg']['queue']:
-        await guild_data[ctx.guild.id]['msg']['queue'].delete()
-        guild_data[ctx.guild.id]['msg']['queue'] = None
+    if guild_data[ctx.guild.id]['msg']['now']:
+        await guild_data[ctx.guild.id]['msg']['now'].delete()
+        guild_data[ctx.guild.id]['msg']['now'] = None
+
     if len(guild_data[ctx.guild.id]['queue']):
         msg_next = await ctx_message_send(ctx, 'playing next...', delete_after=1)
         await msg_next.add_reaction("\u23E9")
+    else:
+        if guild_data[ctx.guild.id]['msg']['queue']:
+            await guild_data[ctx.guild.id]['msg']['queue'].delete()
+            guild_data[ctx.guild.id]['msg']['queue'] = None
 
 
 async def ctx_message_send(ctx, content=None, embed=None, delete_after=None):
