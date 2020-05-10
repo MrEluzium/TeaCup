@@ -62,18 +62,17 @@ async def on_reaction_add(reaction, user):
 @bot.command(name='play', aliases=['p'])
 async def play(ctx, *text, channel=None):
     text = ' '.join(text)
-    if await connect(ctx, channel=channel):
+    if await connect(ctx):
         await add_queue(ctx, text)
 
 
 # @bot.command(name='connect', aliases=['join'])
 async def connect(ctx, channel=None):
     voice = ctx.guild.voice_client
-    channel = channel if channel else ctx.author.voice.channel
     if voice and ctx.author.voice:
-        await voice.move_to(channel)
+        await voice.move_to(ctx.author.voice.channel)
     elif ctx.author.voice:
-        await channel.connect()
+        await ctx.author.voice.channel.connect()
     else:
         emb = cup_embed(title="There is a problem :(",
                         description="You must join the voice channel first.")
