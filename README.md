@@ -1,7 +1,6 @@
-# Teacup Discord Bot
+# TeaСup Discord Bot
 The first music bot I made<br>
-Bot shows playing track and queue automatically
-<br><br>
+<br>
 Commands:<br>
 --play [request] - Play music from YouTube link or text. Alias: --p <br>
 --next - Play next track in queue. If no more tracks in queue it will stop playing. Alias: --n <br>
