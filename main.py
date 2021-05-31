@@ -137,6 +137,7 @@ async def add_queue(ctx, text):
     global guild_data
 
     data = await get_music_url(text, ctx)
+    print(data)
     if data:
         video_url, title, duration, author = data['video_url'], data['title'], data['duration'], data['author']
         try:
